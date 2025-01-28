@@ -71,12 +71,18 @@ def create_hypercube_and_shift(dimension, total_cube_size, num_ones, seed, bit_s
 
     return hypercube, shifted_hypercube
 
-# --- Example Usage ---
+
+
+
+#params in bits
 dimension = 3
-total_cube_size = 6
-num_ones = 16
-seed = 42
-bit_shift_size = 2
+total_cube_size = 2*dimension #2^6 = 2^2^3 (4 length 3d cube)
+bit_shift_size = 2 #2^2 shifting by 0 to 3
+
+
+#other params
+num_ones = 2**dimension/8
+seed = 1
 
 
 hypercube, shifted_hypercube = create_hypercube_and_shift(
