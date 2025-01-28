@@ -8,11 +8,10 @@ def create_hypercube_and_shift(dimension, total_cube_size, num_ones, seed, bit_s
     random.seed(seed)
     np.random.seed(seed)
 
-    total_key_length = 2**total_cube_size  # One key per cell
+    total_key_length = 2**total_cube_size  #one key per cell
 
-    # Create Random Key
     random_key = [
-        [random.randint(0, 2**bit_shift_size - 1) for _ in range(dimension)]
+        [random.randint(0, 2**bit_shift_size - 1) for _ in range(dimension)] #(dimension) bit shifts per cell
         for _ in range(total_key_length)
     ]
 
@@ -22,8 +21,8 @@ def create_hypercube_and_shift(dimension, total_cube_size, num_ones, seed, bit_s
     hypercube = np.zeros(hypercube_shape, dtype=int)
 
 
-    # Populate 1s into random positions
-    indices = random.sample(range(hypercube.size), min(num_ones, hypercube.size))  # Ensure not more than hypercube size
+    #populate 1s into random positions
+    indices = random.sample(range(hypercube.size), min(num_ones, hypercube.size))  #ensure not more than hypercube size
     for index in indices:
         coords = np.unravel_index(index, hypercube.shape)
         hypercube[coords] = 1
@@ -50,8 +49,8 @@ def create_hypercube_and_shift(dimension, total_cube_size, num_ones, seed, bit_s
     
     shift_history = []
 
-    for line_index in np.ndindex(*hypercube.shape): # now loops through each line first
-      for shift_dimension in range(dimension): # then shifts all dimensions in each line.
+    for line_index in np.ndindex(*hypercube.shape): #loops through each line first
+      for shift_dimension in range(dimension): #then shifts all dimensions in each line.
 
         key_index = np.ravel_multi_index(tuple(line_index), hypercube.shape)
         shift_amount = random_key[key_index][shift_dimension]
@@ -60,7 +59,7 @@ def create_hypercube_and_shift(dimension, total_cube_size, num_ones, seed, bit_s
         shifted_hypercube = rotate_bit_shift(shifted_hypercube, random_key, shift_dimension, list(line_index))
         shift_history.append((shift_dimension, line_index, shift_amount, shifted_hypercube.copy(),key_index))
 
-    # Print the last two shifts
+    #print the last two shifts
     for i in range(len(shift_history)-2, len(shift_history)):
       shift_dimension, line_index, shift_amount, shifted_hypercube, key_index = shift_history[i]
       print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
