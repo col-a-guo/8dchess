@@ -64,7 +64,19 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
           temp_slice[shift_dimension] = cell 
           
           new_coords = list(temp_slice)
+          #for demonstration, print before and after some specific times
+          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+            print("Before:")
+            print(new_coords)
+
+
           new_coords[shift_dimension] = (new_coords[shift_dimension] + int(shift_amount)) % cube_side_length
+          
+
+          #for demonstration
+          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+            print("After:")
+            print(new_coords)
           shifted_hypercube[tuple(new_coords)] = hypercube[tuple(temp_slice)]
           
         return shifted_hypercube
@@ -79,11 +91,13 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
 
         key_index = np.ravel_multi_index(tuple(line_index), hypercube.shape)
         shift_amount = arbitrary_key[key_index][shift_dimension]
-        print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+        #also for demonstration
+        if ((shift_amount == "0001") or (shift_amount == "0101")):
+          print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
         
         shifted_hypercube = rotate_bit_shift(shifted_hypercube, arbitrary_key, shift_dimension, list(line_index))
         shift_history.append((shift_dimension, line_index, shift_amount, shifted_hypercube.copy(),key_index))
-
+    #prints last two
     for i in range(len(shift_history)-2, len(shift_history)):
       shift_dimension, line_index, shift_amount, shifted_hypercube, key_index = shift_history[i]
       print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
