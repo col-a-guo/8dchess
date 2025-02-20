@@ -7,7 +7,7 @@ def hex_to_bits(hex_string):
     # Initialising hex string 
     
     # Printing initial string 
-    print ("Initial string", hex_string) 
+    # print ("Initial string", hex_string) 
     
     # Code to convert hex to binary 
     n = int(hex_string, 16) 
@@ -38,7 +38,7 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
     def pad_or_truncate_key(key_hex):
       key_temp = key_hex
       size = int((2**(total_cube_size))*dimension*(2**bit_shift_size)*4/4)
-      print(size)
+      # print(size)
       if len(key_hex) < size:
         key_temp = pad_right(key_hex, size, "0")
       
@@ -56,7 +56,7 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
     key_str = hex_to_bits(pad_or_truncate_key(key_hex))
     key_str = pad_right(key_str, int((2**(total_cube_size))*dimension*(2**bit_shift_size)), "0")
 
-    print(key_str)
+    # print(key_str)
     arbitrary_key = []
     #TODO: see if ravel just works here xd
     for cube_coordinate in range(2**total_cube_size): #loop through each cell of the cube
@@ -90,18 +90,18 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
           
           new_coords = list(temp_slice)
           #for demonstration, print before and after some specific times
-          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
-            print("Before:")
-            print(new_coords)
+          # if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+          #   print("Before:")
+          #   print(new_coords)
 
 
           new_coords[shift_dimension] = (new_coords[shift_dimension] + int(shift_amount,2)) % cube_side_length
           
 
           #for demonstration
-          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
-            print("After:")
-            print(new_coords)
+          # if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+          #   print("After:")
+          #   print(new_coords)
           shifted_hypercube[tuple(new_coords)] = hypercube[tuple(temp_slice)]
           
         return shifted_hypercube
@@ -111,22 +111,22 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
     shift_history = []
 
     for line_index in np.ndindex(*hypercube.shape): #loops through each line first
-      print(line_index)
+      # print(line_index)
       for shift_dimension in range(dimension): #then shifts all dimensions in each line.
 
         key_index = np.ravel_multi_index(tuple(line_index), hypercube.shape)
         shift_amount = arbitrary_key[key_index][shift_dimension]
         #also for demonstration
-        if ((shift_amount == "0001") or (shift_amount == "0101")):
-          print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+        # if ((shift_amount == "0001") or (shift_amount == "0101")):
+        #   print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
         
         shifted_hypercube = rotate_bit_shift(shifted_hypercube, arbitrary_key, shift_dimension, list(line_index))
         shift_history.append((shift_dimension, line_index, shift_amount, shifted_hypercube.copy(),key_index))
     #prints last two
     for i in range(len(shift_history)-2, len(shift_history)):
       shift_dimension, line_index, shift_amount, shifted_hypercube, key_index = shift_history[i]
-      print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
-      print(shifted_hypercube)
+      # print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+      # print(shifted_hypercube)
 
     # print("\nRandom Ahh Key:")
     # print(arbitrary_key)
@@ -134,7 +134,7 @@ def create_hypercube_and_shift(dimension, total_cube_size, key_hex, bit_shift_si
 
     return hypercube, shifted_hypercube
 
-
+#############################################
 def iterate_ndindex_backwards_generator(shape):
     """Iterates through an np.ndindex object backwards using a generator (memory-efficient).
 
@@ -214,18 +214,18 @@ def reverse_hypercube_and_reverse_shift(dimension, total_cube_size, key_hex, bit
           
           new_coords = list(temp_slice)
           #for demonstration, print before and after some specific times
-          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
-            print("Before:")
-            print(new_coords)
+          # if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+          #   print("Before:")
+          #   print(new_coords)
 
 
           new_coords[shift_dimension] = (new_coords[shift_dimension] + int(shift_amount,2)) % cube_side_length
           
 
           #for demonstration
-          if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
-            print("After:")
-            print(new_coords)
+          # if ((shift_amount == "0001") or (shift_amount == "0101")) and line_slice[0]==5:
+          #   # print("After:")
+          #   # print(new_coords)
           shifted_hypercube[tuple(new_coords)] = hypercube[tuple(temp_slice)]
           
         return shifted_hypercube
@@ -235,21 +235,21 @@ def reverse_hypercube_and_reverse_shift(dimension, total_cube_size, key_hex, bit
     shift_history = []
 
     for line_index in iterate_ndindex_backwards_generator(hypercube.shape): #loops through each line backwards
-      print(line_index)
+      # print(line_index)
       for shift_dimension in range(dimension): #then shifts all dimensions in each line.
 
         key_index = np.ravel_multi_index(tuple(line_index), hypercube.shape)
         shift_amount = arbitrary_key[key_index][shift_dimension]
         #also for demonstration``
-        if ((shift_amount == "0001") or (shift_amount == "0101")):
-          print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+        # if ((shift_amount == "0001") or (shift_amount == "0101")):
+        #   print(f"Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
         
         shifted_hypercube = rotate_bit_shift(shifted_hypercube, arbitrary_key, shift_dimension, list(line_index))
         shift_history.append((shift_dimension, line_index, shift_amount, shifted_hypercube.copy(),key_index))
     #prints last two
     for i in range(len(shift_history)-2, len(shift_history)):
       shift_dimension, line_index, shift_amount, shifted_hypercube, key_index = shift_history[i]
-      print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+      # print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
       print(shifted_hypercube)
 
     # print("\nRandom Ahh Key:")
@@ -258,23 +258,34 @@ def reverse_hypercube_and_reverse_shift(dimension, total_cube_size, key_hex, bit
 
     return hypercube, shifted_hypercube
 
+def bytearray_to_bits_array(byte_data):
+    return [int(bit) for byte in byte_data for bit in format(byte, '01b')]
+
 #power of 2 params
+byte_data = b'\x00\x01\x01\x00\x01\x01\x00\x01'
 dimension = 3
-total_cube_size = 3 #2^3
+total_cube_size = 3#2^3
 bit_shift_size = 2 #2^2 shifting by 0 to 3
-cube_data = [0,1,1,0,1,1,0,1] #total 2^3 = 8 entries 
+cube_data = bytearray_to_bits_array(byte_data) #total 2^3 = 8 entries 
+
+if len(cube_data) < 8:
+    cube_data.extend([0] * (8 - len(cube_data)))
+
+
 
 key_hex = ""
 for i in range(12):
    key_hex+=str(random.randint(0,9))
+   
 hypercube, shifted_hypercube = create_hypercube_and_shift(
     dimension, total_cube_size, key_hex, bit_shift_size, cube_data
 )
 
+print("hypercube")
 print(hypercube)
 
 hypercube, og_hypercube = reverse_hypercube_and_reverse_shift(
     dimension, total_cube_size, key_hex, bit_shift_size, shifted_hypercube
 )
-
+print("og_hypercube")
 print(og_hypercube)
