@@ -249,7 +249,7 @@ def reverse_hypercube_and_reverse_shift(dimension, total_cube_size, key_hex, bit
     #prints last two
     for i in range(len(shift_history)-2, len(shift_history)):
       shift_dimension, line_index, shift_amount, shifted_hypercube, key_index = shift_history[i]
-      # print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
+      print(f"Shift: Bit shift (line {line_index}, dimension {shift_dimension}): {shift_amount}")
       print(shifted_hypercube)
 
     # print("\nRandom Ahh Key:")
@@ -264,28 +264,29 @@ def bytearray_to_bits_array(byte_data):
 #power of 2 params
 byte_data = b'\x00\x01\x01\x00\x01\x01\x00\x01'
 dimension = 3
-total_cube_size = 3#2^3
+total_cube_size = 12#2^3
 bit_shift_size = 2 #2^2 shifting by 0 to 3
 cube_data = bytearray_to_bits_array(byte_data) #total 2^3 = 8 entries 
 
-if len(cube_data) < 8:
-    cube_data.extend([0] * (8 - len(cube_data)))
+if len(cube_data) < 4096:
+    cube_data.extend([0] * (4096 - len(cube_data)))
+    # key_hex = ""
 
 
 
 key_hex = ""
 for i in range(12):
    key_hex+=str(random.randint(0,9))
-   
 hypercube, shifted_hypercube = create_hypercube_and_shift(
     dimension, total_cube_size, key_hex, bit_shift_size, cube_data
 )
-
-print("hypercube")
+for i in range(12):
+    hypercube, shifted_hypercube = create_hypercube_and_shift(
+        dimension, total_cube_size, key_hex, bit_shift_size, cube_data)
 print(hypercube)
 
 hypercube, og_hypercube = reverse_hypercube_and_reverse_shift(
     dimension, total_cube_size, key_hex, bit_shift_size, shifted_hypercube
 )
-print("og_hypercube")
+
 print(og_hypercube)
