@@ -124,7 +124,7 @@ def main():
 
 
     print("diff:")
-    print(np.sum(np.abs(np.array(hypercube)-np.array(og_hypercube))))
+    print((np.array(hypercube)-np.array(og_hypercube)))
 
 if __name__ == "__main__":
     # start = time.time()
