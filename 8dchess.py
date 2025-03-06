@@ -31,8 +31,6 @@ def apply_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensi
             shift = key[index] % hypercube_length
             rotated_index_cube = np.roll(rotated_index_cube, shift, axis=dim)
             index += 1
-            if index >= len(key):
-                return rotated_index_cube
     return rotated_index_cube
 
 def reverse_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensions):
@@ -44,8 +42,6 @@ def reverse_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimen
             shift = key[index] % hypercube_length
             rotated_index_cube = np.roll(rotated_index_cube, -shift, axis=dim)
             index -= 1
-            if index < 0:
-                return rotated_index_cube
     return rotated_index_cube
 
 def encrypt_byte_array(byte_array, key, hypercube_length, square_length, num_dimensions):
@@ -100,8 +96,41 @@ def pad_with_pi(data, required_size):
         pi_index = (pi_index + 2) % len(pi_digits) #cycle through the digits of pi
     return padded_data[:required_size]  # Truncate if necessary
 
+def unpad_with_pi(data):
+    """Removes padding from the data, assuming it was padded with the digits of pi."""
+    pi_digits = str(pi).replace('.', '')
+    pi_bytes = bytearray()
+
+    # Convert the first 10 digits of pi to bytes, assuming pairs of digits are bytes
+    for i in range(0, 20, 2):  # Check first 20 digits because key padding might need more than data padding
+        digit_pair = pi_digits[i:i + 2]
+        if len(digit_pair) == 2:  # Handle cases where pi_digits has an odd length
+            try:
+                pi_bytes.append(int(digit_pair))  # Convert pi digit pairs to bytes
+            except ValueError:
+                return data  # If there's an error, assume no padding and return original data
+        else:
+            break # Stop when there's not a full digit pair
+
+    # Convert the data to bytearray if it isn't already.
+    data = bytearray(data)
+
+    # Find the index of the pi sequence in the data
+    try:
+      index = data.index(pi_bytes[0])
+      if len(data) - index >= len(pi_bytes):
+          if data[index:index + len(pi_bytes)] == pi_bytes:
+              return data[:index]  # Truncate data at the start of the pi sequence
+          else:
+              return data #didn't find it so return the data unedited
+      else:
+        return data #pi sequence too short to match
+    except ValueError:  # Substring not found
+        return data # didn't find it so return the data unedited
+
+
 # Constants
-hypercube_length, square_length, num_dimensions = 8, 32, 3
+hypercube_length, square_length, num_dimensions = 8, 512, 3
 
 # Calculate required sizes
 data_size = hypercube_length**num_dimensions * square_length*square_length // 8
@@ -109,12 +138,16 @@ key_size = (hypercube_length**num_dimensions) * num_dimensions
 
 # Generate random data and key
 original_byte_array = generate_random_data(data_size // 2) #smaller than it should be to test padding
-key = generate_random_data(key_size //2) # smaller than it should be
+key = generate_random_data(key_size // 2) # smaller than it should be
 
 # Pad with pi
 original_byte_array = pad_with_pi(original_byte_array, data_size)
 key = pad_with_pi(key, key_size)
 
+
+#Check key size AFTER padding
+if len(key) != key_size:
+    print(f"ERROR: Key size is incorrect. Expected {key_size}, got {len(key)}")
 
 # Run the code with cProfile
 with cProfile.Profile() as pr:
@@ -124,11 +157,23 @@ with cProfile.Profile() as pr:
     # Decrypt the data
     decrypted_byte_array = decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_dimensions)
 
+    # Unpad the decrypted data
+    unpadded_byte_array = unpad_with_pi(decrypted_byte_array)
+
+    # Remove padding from original data to compare
+    original_unpadded_byte_array = unpad_with_pi(original_byte_array)
+
     # Verify the decryption
-    if original_byte_array == decrypted_byte_array:
-        print("Decryption successful!")
+    if original_unpadded_byte_array == unpadded_byte_array:
+        print("Decryption and unpadding successful!")
     else:
-        print("Decryption failed.")
+        print("Decryption or unpadding failed.")
+        print(f"Original unpadded length: {len(original_unpadded_byte_array)}")
+        print(f"Decrypted unpadded length: {len(unpadded_byte_array)}")
+        # Optionally print the first few bytes to help debug
+        print(f"Original start: {original_unpadded_byte_array[:10]}")
+        print(f"Decrypted start: {unpadded_byte_array[:10]}")
+
 
 # Print cProfile results
 stats = pstats.Stats(pr)
