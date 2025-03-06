@@ -2,6 +2,7 @@ import numpy as np
 import random
 import cProfile
 import pstats
+from math import pi
 
 def generate_random_data(size):
     return bytearray(random.getrandbits(8) for _ in range(size))
@@ -80,15 +81,39 @@ def decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_
 
     return byte_array
 
+def pad_with_pi(data, required_size):
+    """Pads the data with digits of pi until it reaches the required size."""
+    pi_digits = str(pi).replace('.', '')  # Remove decimal point
+    padded_data = bytearray(data)
+
+    pi_index = 0
+    while len(padded_data) < required_size:
+        digit_pair = pi_digits[pi_index:pi_index + 2]
+        if len(digit_pair) == 2:
+            try:
+                padded_data.append(int(digit_pair)) #convert pi digit pairs to bytes
+            except ValueError:
+                padded_data.append(0) #if there is an error, pad with a zero
+        else:
+            padded_data.append(0) #pad with 0 if you can't get 2 digits.
+
+        pi_index = (pi_index + 2) % len(pi_digits) #cycle through the digits of pi
+    return padded_data[:required_size]  # Truncate if necessary
 
 # Constants
-hypercube_length, square_length, num_dimensions = 8, 512, 3
+hypercube_length, square_length, num_dimensions = 8, 32, 3
+
+# Calculate required sizes
+data_size = hypercube_length**num_dimensions * square_length*square_length // 8
+key_size = (hypercube_length**num_dimensions) * num_dimensions
 
 # Generate random data and key
-data_size = hypercube_length**num_dimensions * square_length*square_length // 8
-original_byte_array = generate_random_data(data_size)
-key_size = (hypercube_length**num_dimensions) * num_dimensions
-key = generate_random_data(key_size)
+original_byte_array = generate_random_data(data_size // 2) #smaller than it should be to test padding
+key = generate_random_data(key_size //2) # smaller than it should be
+
+# Pad with pi
+original_byte_array = pad_with_pi(original_byte_array, data_size)
+key = pad_with_pi(key, key_size)
 
 
 # Run the code with cProfile
@@ -106,13 +131,6 @@ with cProfile.Profile() as pr:
         print("Decryption failed.")
 
 # Print cProfile results
-
 stats = pstats.Stats(pr)
 stats.sort_stats(pstats.SortKey.TIME)
-stats.print_stats()  # Or stats.dump_stats('profile_output.prof') to save to a file
-
-# Alternative printouts
-#stats.print_cumulative() #prints cumulative time
-#stats.print_callers() #prints call relationship
-#stats.print_callees() #prints call relationship
-#stats.print_stats(20) #prints top 20 results
+stats.print_stats()
