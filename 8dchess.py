@@ -1,236 +1,118 @@
-import sys
-import random
 import numpy as np
-import time
+import random
 import cProfile
 import pstats
-#from bitarray import bitarray  # No longer needed
 
-def pad_right_list(lst, length, value=None):
-    if len(lst) >= length:
-        return lst
-    return lst + [value] * (length - len(lst))
+def generate_random_data(size):
+    return bytearray(random.getrandbits(8) for _ in range(size))
 
-def create_hypercube_and_shift(dimension, big_cube_size, small_cube_side_power, key_hex, cube_data):  #Removed bit_shift_size
-    """
-    Takes a bytearray as input, transforms it into a hypercube, applies shifts,
-    and returns a bytearray.
-    """
-    cube_side_length = 2 ** (big_cube_size // dimension)
-    small_cube_side_length = 2**small_cube_side_power
+def bitarray_from_bytearray(bytearr):
+    return np.unpackbits(np.array(bytearr, dtype=np.uint8))
 
-    def pad_or_truncate_key(key_hex):
-        key_temp = key_hex
-        size = (2**big_cube_size) * dimension  # Each shift is now 1 byte
-        if len(key_hex) < size:
-            key_temp = pad_right_list(key_hex, size, 0)  # Pad with 0 instead of "0" (integers)
-        elif len(key_hex) > size:
-            key_temp = key_hex[:size]
-        else:
-            key_temp = key_hex
-        return key_temp
+def create_hypercube_of_squares(bitarr, hypercube_length, square_length, num_dimensions):
+    """Creates a hypercube where each cell contains a square (square_length x square_length)."""
+    cube_size = hypercube_length ** num_dimensions * (square_length * square_length)
+    reshaped = bitarr[:cube_size].reshape((hypercube_length,) * num_dimensions + (square_length, square_length))
+    return reshaped
 
-    key = pad_or_truncate_key(key_hex)
-    arbitrary_key = np.array(key).reshape((2**big_cube_size, dimension))  # Precompute key shifts
+def create_index_cube(hypercube_length, num_dimensions):
+    """Creates a hypercube where each cell contains its own multi-dimensional index."""
+    indices = np.indices((hypercube_length,) * num_dimensions)
+    index_cube = np.stack(indices, axis=-1)
+    return index_cube
 
-    # Calculate the shape of the hypercube. The last dimensions are the
-    # small cube of bytes within each cell.
-    hypercube_shape = (cube_side_length,) * dimension + (small_cube_side_length,) * dimension
+def apply_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensions):
+    """Applies rotations based on the key to the index cube."""
+    rotated_index_cube = np.copy(index_cube)  # Avoid modifying the original
+    index = 0
+    for coords in np.ndindex((hypercube_length,) * num_dimensions):
+        for dim in range(num_dimensions):
+            shift = key[index] % hypercube_length
+            rotated_index_cube = np.roll(rotated_index_cube, shift, axis=dim)
+            index += 1
+            if index >= len(key):
+                return rotated_index_cube
+    return rotated_index_cube
 
-    # Ensure that the cube_data (bytearray) is converted into a numpy array of
-    # integers (0-255) before reshaping.
-    hypercube = np.array(cube_data).reshape(hypercube_shape)
+def reverse_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensions):
+    """Applies reverse rotations based on the key to the index cube."""
+    rotated_index_cube = np.copy(index_cube)  # Avoid modifying the original
+    index = len(key) - 1
+    for coords in reversed(list(np.ndindex((hypercube_length,) * num_dimensions))):
+        for dim in reversed(range(num_dimensions)):
+            shift = key[index] % hypercube_length
+            rotated_index_cube = np.roll(rotated_index_cube, -shift, axis=dim)
+            index -= 1
+            if index < 0:
+                return rotated_index_cube
+    return rotated_index_cube
 
-    def roll_axis_slice(arr, shift, axis):
-        """Rolls an array along a single axis using slicing."""
-        shift = shift % arr.shape[axis]  # Normalize shift
-        if shift == 0:
-            return arr  # No shift needed
-        idx = tuple(slice(None) if i != axis else slice(shift, None) for i in range(arr.ndim))
-        idx_rem = tuple(slice(None) if i != axis else slice(0, shift) for i in range(arr.ndim))
-        res = np.concatenate((arr[idx], arr[idx_rem]), axis=axis)
-        return res
+def encrypt_byte_array(byte_array, key, hypercube_length, square_length, num_dimensions):
+    """Encrypts the byte array into a hypercube of squares using the index cube rotation."""
+    bit_array = bitarray_from_bytearray(byte_array)
+    cube_of_squares = create_hypercube_of_squares(bit_array, hypercube_length, square_length, num_dimensions)
+    index_cube = create_index_cube(hypercube_length, num_dimensions)
+    rotated_index_cube = apply_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensions)
+    encrypted_cube = np.zeros_like(cube_of_squares)  # Initialize with zeros, same shape and type
 
-    def rotate_bit_shift(hypercube, arbitrary_key, shift_dimension, line_index):
-        cube_index = line_index[:-dimension]  # Exclude the last dimensions
-        # Mod the shift amount here
-        shift_amount = arbitrary_key[np.ravel_multi_index(cube_index, hypercube.shape[:-dimension])][shift_dimension] % (2**small_cube_side_power)
-        shifted_hypercube = roll_axis_slice(hypercube, shift_amount, shift_dimension)  # Use roll_axis_slice
-        return shifted_hypercube
+    for coords in np.ndindex((hypercube_length,) * num_dimensions):
+        original_coords = tuple(rotated_index_cube[coords])
+        encrypted_cube[coords] = cube_of_squares[original_coords]
 
-    def rotate_small_cube(small_cube, shift_amount, axis):
-        """Rotates a single small cube."""
-        # Mod the shift amount here
-        shift_amount = shift_amount % (2**small_cube_side_power)
-        return roll_axis_slice(small_cube, shift_amount, axis) #Use roll_axis_slice
+    return encrypted_cube
 
-    shifted_hypercube = hypercube.copy()
+def decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_dimensions):
+    """Decrypts the hypercube of squares back into a byte array using reversed index cube rotation."""
+    index_cube = create_index_cube(hypercube_length, num_dimensions)
+    rotated_index_cube = reverse_rotations_to_index_cube(index_cube, key, hypercube_length, num_dimensions)
+    decrypted_cube = np.zeros_like(encrypted_cube)  # Initialize with zeros, same shape and type
 
-    # Iterate over all the *outer cube* cells
-    for outer_cube_index in np.ndindex(*hypercube.shape[:-dimension]):
-        # Extract the current small cube
-        small_cube = hypercube[outer_cube_index]
+    for coords in np.ndindex((hypercube_length,) * num_dimensions):
+        original_coords = tuple(rotated_index_cube[coords])
+        decrypted_cube[coords] = encrypted_cube[original_coords]  # Fill by reverse lookup
 
-        # Apply the same shift to the small cube along each of its dimensions.
+    # Flatten the cube back into a bit array
+    bit_array = decrypted_cube.flatten()
 
-        for shift_dimension in range(dimension):
-            # Use the *same* key for the small cube shift
-            # Mod the shift amount here
-            shift_amount = arbitrary_key[np.ravel_multi_index(outer_cube_index, hypercube.shape[:-dimension])][shift_dimension] % (2**small_cube_side_power)
-            small_cube = rotate_small_cube(small_cube, shift_amount, shift_dimension)
+    # Pack the bit array back into a byte array.  Must be multiple of 8
+    bit_array = bit_array[:len(bit_array) - (len(bit_array) % 8)]
+    byte_array = np.packbits(bit_array).tobytes()
 
-        # Replace the original small cube with the shifted version.
-        shifted_hypercube[outer_cube_index] = small_cube
-
-    # Outer Shift
-    for line_index in np.ndindex(*hypercube.shape[:-dimension]):
-        for shift_dimension in range(dimension):
-            shifted_hypercube = rotate_bit_shift(shifted_hypercube, arbitrary_key, shift_dimension, tuple(list(line_index) + [0] * dimension))
-
-    # Flatten the hypercube back into a bytearray
-    shifted_cube_data = bytearray(shifted_hypercube.flatten().tolist())  # Convert to list for bytearray
-
-    return shifted_cube_data
+    return byte_array
 
 
-#############################################
-def iterate_ndindex_backwards_generator(shape):
-    shape = tuple(shape)
-    total_size = np.prod(shape, dtype=np.intp)
-    for i in range(total_size - 1, -1, -1):
-        index = np.unravel_index(i, shape)
-        yield index
+# Constants
+hypercube_length, square_length, num_dimensions = 8, 512, 3
 
-def reverse_hypercube_and_reverse_shift(dimension, big_cube_size, small_cube_side_power, key_hex, cube_data):  #Removed bit_shift_size
-    """
-    Takes a bytearray as input, transforms it into a hypercube, applies reverse shifts,
-    and returns a bytearray.
-    """
-    cube_side_length = 2 ** (big_cube_size // dimension)
-    small_cube_side_length = 2**small_cube_side_power
-
-    def pad_or_truncate_key(key_hex):
-        key_temp = key_hex
-        size = (2**big_cube_size) * dimension  # Each shift is now 1 byte
-        if len(key_hex) < size:
-            key_temp = pad_right_list(key_hex, size, 0)  # Pad with 0 instead of "0" (integers)
-        elif len(key_hex) > size:
-            key_temp = key_hex[:size]
-        else:
-            key_temp = key_hex
-        return key_temp
-
-    key = pad_or_truncate_key(key_hex)
-    arbitrary_key = np.array(key).reshape((2**big_cube_size, dimension))  # Precompute key shifts
-
-    # Calculate the shape of the hypercube. The last dimensions are the
-    # small cube of bytes within each cell.
-    hypercube_shape = (cube_side_length,) * dimension + (small_cube_side_length,) * dimension
-
-    # Ensure that the cube_data (bytearray) is converted into a numpy array of
-    # integers (0-255) before reshaping.
-    hypercube = np.array(cube_data).reshape(hypercube_shape)
-
-    def roll_axis_slice(arr, shift, axis):
-        """Rolls an array along a single axis using slicing."""
-        shift = shift % arr.shape[axis]  # Normalize shift
-        if shift == 0:
-            return arr  # No shift needed
-        idx = tuple(slice(None) if i != axis else slice(shift, None) for i in range(arr.ndim))
-        idx_rem = tuple(slice(None) if i != axis else slice(0, shift) for i in range(arr.ndim))
-        res = np.concatenate((arr[idx], arr[idx_rem]), axis=axis)
-        return res
-
-    def rotate_bit_shift(hypercube, arbitrary_key, shift_dimension, line_index):
-        cube_index = line_index[:-dimension]  # Exclude the last dimensions
-        # Mod the shift amount here, with the correct shift
-        shift_amount = ((2**small_cube_side_power) - arbitrary_key[np.ravel_multi_index(cube_index, hypercube.shape[:-dimension])][shift_dimension]) % (2**small_cube_side_power)
-        shifted_hypercube = roll_axis_slice(shifted_hypercube, shift_amount, shift_dimension) #Use roll_axis_slice
-        return shifted_hypercube
-
-    def rotate_small_cube(small_cube, shift_amount, axis):
-        """Rotates a single small cube."""
-        # Mod the shift amount here
-        shift_amount = shift_amount % (2**small_cube_side_power)
-        return roll_axis_slice(small_cube, shift_amount, axis) #Use roll_axis_slice
-
-    shifted_hypercube = hypercube.copy()
-
-    # Iterate over all the *outer cube* cells in reverse order
-    for outer_cube_index in iterate_ndindex_backwards_generator(hypercube.shape[:-dimension]):
-        # Extract the current small cube
-        small_cube = hypercube[outer_cube_index]
-
-        # Apply the *reverse* shift to the small cube along each of its dimensions.
-        for shift_dimension in iterate_ndindex_backwards_generator(range(dimension)):
-            # Use the *same* key for the small cube shift, but reverse the shift
-            #Mod the shift amount here
-            shift_amount = ((2**small_cube_side_power) - arbitrary_key[np.ravel_multi_index(outer_cube_index, hypercube.shape[:-dimension])][shift_dimension]) % (2**small_cube_side_power)
-            small_cube = rotate_small_cube(small_cube, shift_amount, shift_dimension)
-
-        # Replace the original small cube with the shifted version.
-        shifted_hypercube[outer_cube_index] = small_cube
-
-    # Outer Shift
-    for line_index in iterate_ndindex_backwards_generator(hypercube.shape[:-dimension]):
-        for shift_dimension in iterate_ndindex_backwards_generator(range(dimension)):
-            shifted_hypercube = rotate_bit_shift(shifted_hypercube, arbitrary_key, shift_dimension, tuple(list(line_index) + [0] * dimension))
-
-    # Flatten the hypercube back into a bytearray
-    og_cube_data = bytearray(shifted_hypercube.flatten().tolist())
-
-    return og_cube_data
-
-def main():
-    
-    # power of 2 params
-    dimension = 3
-    big_cube_side_power = 4
-    small_cube_side_power = 3
-    big_cube_size = 3*big_cube_side_power # changed from 3*big_cube_side_power
-    # Account for 512 bits arranged in 8x8x8 cube
-    
-    big_cube_side_length = 2**big_cube_side_power
-
-    small_cube_side_length = 2**small_cube_side_power
-    #num_bits = 2**big_cube_size * small_cube_side_length**dimension
-    num_bytes = big_cube_side_length**dimension * small_cube_side_length**dimension #Correct calculation in bytes
+# Generate random data and key
+data_size = hypercube_length**num_dimensions * square_length*square_length // 8
+original_byte_array = generate_random_data(data_size)
+key_size = (hypercube_length**num_dimensions) * num_dimensions
+key = generate_random_data(key_size)
 
 
-    #bit_data = bitarray()
-    #bit_data.extend(random.choice([False, True]) for _ in range(num_bits))
+# Run the code with cProfile
+with cProfile.Profile() as pr:
+    # Encrypt the data
+    encrypted_cube = encrypt_byte_array(original_byte_array, key, hypercube_length, square_length, num_dimensions)
 
-    #cube_data = bit_data  #
+    # Decrypt the data
+    decrypted_byte_array = decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_dimensions)
 
-    cube_data = bytearray(random.randint(0, 255) for _ in range(num_bytes))
+    # Verify the decryption
+    if original_byte_array == decrypted_byte_array:
+        print("Decryption successful!")
+    else:
+        print("Decryption failed.")
 
-    if len(cube_data) < num_bytes:
-        cube_data.extend(bytearray([0] * (num_bytes - len(cube_data)))) #Padded with bytes of 0
+# Print cProfile results
 
-    if len(cube_data) > num_bytes:
-        cube_data = cube_data[:num_bytes]
+stats = pstats.Stats(pr)
+stats.sort_stats(pstats.SortKey.TIME)
+stats.print_stats()  # Or stats.dump_stats('profile_output.prof') to save to a file
 
-    # Generate a bytearray for key shifts with the length of
-    # (2**big_cube_size)*dimension (one byte per key)
-    key_byte = bytearray([random.randint(0, 64) for i in range((2**big_cube_size) * dimension)])  # Bytes
-
-    # Mod the key bytes *before* creating the hypercube
-    key_byte = bytearray([k % (2**small_cube_side_power) for k in key_byte])
-
-    shifted_cube_data = create_hypercube_and_shift(dimension, big_cube_size, small_cube_side_power, key_byte, cube_data)
-
-    og_cube_data = reverse_hypercube_and_reverse_shift(dimension, big_cube_size, small_cube_side_power, key_byte, shifted_cube_data)
-
-
-    print("diff:")
-    print((np.array(cube_data)-np.array(og_cube_data)))
-
-if __name__ == "__main__":
-    # start = time.time()
-    cProfile.run('main()', 'profile_output')
-
-    p = pstats.Stats('profile_output')
-    p.sort_stats('cumulative').print_stats(20)
-
-    # end = time.time()
-    # print(end - start)
+# Alternative printouts
+#stats.print_cumulative() #prints cumulative time
+#stats.print_callers() #prints call relationship
+#stats.print_callees() #prints call relationship
+#stats.print_stats(20) #prints top 20 results
