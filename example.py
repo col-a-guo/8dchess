@@ -100,52 +100,87 @@ def pad_with_pi(data, required_size):
         pi_index = (pi_index + 2) % len(pi_digits) #cycle through the digits of pi
     return padded_data[:required_size]  # Truncate if necessary
 
-# Constants
-hypercube_length, square_length, num_dimensions = 8, 32, 3
 
-# Calculate required sizes
-data_size = hypercube_length**num_dimensions * square_length*square_length // 8
-key_size = (hypercube_length**num_dimensions) * num_dimensions
+def unpad_with_pi(data):
+    """Removes padding from the data, assuming it was padded with the digits of pi."""
+    pi_digits = str(pi).replace('.', '')
+    pi_bytes = bytearray()
 
-file_path = 'ORV.txt'
+    # Convert the first 10 digits of pi to bytes, assuming pairs of digits are bytes
+    for i in range(0, 20, 2):  # Check first 20 digits because key padding might need more than data padding
+        digit_pair = pi_digits[i:i + 2]
+        if len(digit_pair) == 2:  # Handle cases where pi_digits has an odd length
+            try:
+                pi_bytes.append(int(digit_pair))  # Convert pi digit pairs to bytes
+            except ValueError:
+                return data  # If there's an error, assume no padding and return original data
+        else:
+            break # Stop when there's not a full digit pair
 
-# Open the file and read its contents
-with open(file_path, 'rb') as file:
-    myfile = file.read()
+    # Convert the data to bytearray if it isn't already.
+    data = bytearray(data)
 
-# Now file_contents holds the content of the text file
-print(myfile)
-
-
-
-# print(myfile)
-# Generate random data and key
-original_byte_array = bytearray(myfile) #smaller than it should be to test padding
-key = generate_random_data(key_size //2) # smaller than it should be
-
-# Pad with pi
-original_byte_array = pad_with_pi(original_byte_array, data_size)
-key = pad_with_pi(key, key_size)
+    # Find the index of the pi sequence in the data
+    try:
+      index = data.index(pi_bytes[0])
+      if len(data) - index >= len(pi_bytes):
+          if data[index:index + len(pi_bytes)] == pi_bytes:
+              return data[:index]  # Truncate data at the start of the pi sequence
+          else:
+              return data #didn't find it so return the data unedited
+      else:
+        return data #pi sequence too short to match
+    except ValueError:  # Substring not found
+        return data # didn't find it so return the data unedited
 
 
-# Run the code with cProfile
-with cProfile.Profile() as pr:
-    # Encrypt the data
-    encrypted_cube = encrypt_byte_array(original_byte_array, key, hypercube_length, square_length, num_dimensions)
+if __name__ == '__main__':
+    # Constants
+    hypercube_length, square_length, num_dimensions = 8, 32, 3
 
-    # Decrypt the data
-    decrypted_byte_array = decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_dimensions)
+    # Calculate required sizes
+    data_size = hypercube_length**num_dimensions * square_length*square_length // 8
+    key_size = (hypercube_length**num_dimensions) * num_dimensions
 
-    # Verify the decryption
-    if original_byte_array == decrypted_byte_array:
-        print("Decryption successful!")
-        
-        original_file = decrypted_byte_array.decode('utf-8')
-        print(original_file)
-    else:
-        print("Decryption failed.")
+    file_path = 'ORV.txt'
 
-# Print cProfile results
-stats = pstats.Stats(pr)
-stats.sort_stats(pstats.SortKey.TIME)
-stats.print_stats()
+    # Open the file and read its contents
+    with open(file_path, 'rb') as file:
+        myfile = file.read()
+
+    # Now file_contents holds the content of the text file
+    print(myfile)
+
+
+
+    # print(myfile)
+    # Generate random data and key
+    original_byte_array = bytearray(myfile) #smaller than it should be to test padding
+    key = generate_random_data(key_size //2) # smaller than it should be
+
+    # Pad with pi
+    original_byte_array = pad_with_pi(original_byte_array, data_size)
+    key = pad_with_pi(key, key_size)
+
+
+    # Run the code with cProfile
+    with cProfile.Profile() as pr:
+        # Encrypt the data
+        encrypted_cube = encrypt_byte_array(original_byte_array, key, hypercube_length, square_length, num_dimensions)
+
+        # Decrypt the data
+        decrypted_byte_array = decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_dimensions)
+
+        # Verify the decryption
+        if original_byte_array == decrypted_byte_array:
+            print("Decryption successful!")
+            
+            original_file = unpad_with_pi(decrypted_byte_array).decode('utf-8')
+            print(original_file)
+        else:
+            print("Decryption failed.")
+
+    # Print cProfile results
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.print_stats()

@@ -3,6 +3,7 @@ import random
 import cProfile
 import pstats
 from math import pi
+import math
 
 def generate_random_data(size):
     return bytearray(random.getrandbits(8) for _ in range(size))
@@ -79,7 +80,7 @@ def decrypt_hypercube(encrypted_cube, key, hypercube_length, square_length, num_
 
 def pad_with_pi(data, required_size):
     """Pads the data with digits of pi until it reaches the required size."""
-    pi_digits = str(pi).replace('.', '')  # Remove decimal point
+    pi_digits = str(math.pi).replace('.', '')  # Remove decimal point
     padded_data = bytearray(data)
 
     pi_index = 0
@@ -89,7 +90,7 @@ def pad_with_pi(data, required_size):
             try:
                 padded_data.append(int(digit_pair)) #convert pi digit pairs to bytes
             except ValueError:
-                padded_data.append(0) #if there is an error, pad with a zero
+                padded_data.append(0) #if there is an error, pad with a zero 
         else:
             padded_data.append(0) #pad with 0 if you can't get 2 digits.
 
@@ -98,7 +99,7 @@ def pad_with_pi(data, required_size):
 
 def unpad_with_pi(data):
     """Removes padding from the data, assuming it was padded with the digits of pi."""
-    pi_digits = str(pi).replace('.', '')
+    pi_digits = str(math.pi).replace('.', '')
     pi_bytes = bytearray()
 
     # Convert the first 10 digits of pi to bytes, assuming pairs of digits are bytes
@@ -127,7 +128,6 @@ def unpad_with_pi(data):
         return data #pi sequence too short to match
     except ValueError:  # Substring not found
         return data # didn't find it so return the data unedited
-
 
 # Constants
 hypercube_length, square_length, num_dimensions = 8, 512, 3
@@ -179,3 +179,4 @@ with cProfile.Profile() as pr:
 stats = pstats.Stats(pr)
 stats.sort_stats(pstats.SortKey.TIME)
 stats.print_stats()
+
